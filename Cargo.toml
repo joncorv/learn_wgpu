@@ -1,0 +1,13 @@
+[package]
+name = "learn_wgpu"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+cargo-watch = "8.5.3"
+env_logger = "0.11.9"
+log = "0.4.29"
+pollster = "0.4.0"
+wgpu = "28.0.0"
+winit = "0.30.13"
