@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use winit::{
     application::ApplicationHandler,
+    dpi::PhysicalPosition,
     event::*,
     event_loop::{
         ActiveEventLoop,
@@ -25,7 +26,9 @@ pub struct State
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
+    render_pipeline: wgpu::RenderPipeline,
     window: Arc<Window>,
+    bg_color: wgpu::Color,
 }
 
 impl State
@@ -81,6 +84,61 @@ impl State
             desired_maximum_frame_latency: 2,
         };
 
+        let bg_color = wgpu::Color::default();
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                immediate_size: 0,
+            });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"), // 1.
+                buffers: &[],                 // 2.
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                // 3.
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    // 4.
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview_mask: None,
+            cache: None,
+            // continued ...
+        });
+
         Ok(Self {
             surface,
             device,
@@ -88,6 +146,8 @@ impl State
             config,
             is_surface_configured: false,
             window,
+            bg_color,
+            render_pipeline,
         })
     }
 
@@ -101,6 +161,14 @@ impl State
             self.is_surface_configured = true;
         }
         println!("girl we be resizing! width: {width}, height: {height}");
+    }
+
+    fn handle_mouse(&mut self, _device_id: DeviceId, position: PhysicalPosition<f64>)
+    {
+        self.bg_color.r = position.x / self.window.inner_size().width as f64;
+        self.bg_color.g = position.y / self.window.inner_size().height as f64;
+
+        dbg!(self.bg_color);
     }
 
     fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool)
@@ -122,10 +190,18 @@ impl State
         }
     }
 
+    // ###################################################################
+    //      Main Application State ---- Update
+    // ###################################################################
+
     fn update(&mut self)
     {
         // remove `todo!()`
     }
+
+    // ###################################################################
+    //      Main Application State ---- Render
+    // ###################################################################
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError>
     {
@@ -150,19 +226,14 @@ impl State
             });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
                     depth_slice: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Clear(self.bg_color),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -171,6 +242,9 @@ impl State
                 timestamp_writes: None,
                 multiview_mask: None,
             });
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.draw(0..3, 0..1);
         }
 
         // submit will accept anything that implements IntoIter
@@ -182,7 +256,7 @@ impl State
 }
 
 // ###################################################################
-//      App and ApplicationHandler
+//      App Struct
 // ###################################################################
 
 pub struct App
@@ -197,6 +271,10 @@ impl App
         Self { state: None }
     }
 }
+
+// ###################################################################
+//      ApplicationHandler
+// ###################################################################
 
 impl ApplicationHandler<State> for App
 {
@@ -261,6 +339,13 @@ impl ApplicationHandler<State> for App
                     },
                 ..
             } => state.handle_key(event_loop, code, key_state.is_pressed()),
+            WindowEvent::CursorMoved {
+                device_id,
+                position,
+            } =>
+            {
+                state.handle_mouse(device_id, position);
+            }
             _ =>
             {}
         }
@@ -280,10 +365,7 @@ pub fn run() -> anyhow::Result<()>
     Ok(())
 }
 
-fn main()
+fn main() -> anyhow::Result<()>
 {
-    if let Err(e) = run()
-    {
-        eprint!("{e:#}");
-    }
+    run()
 }
