@@ -14,7 +14,12 @@ use winit::{
     window::Window,
 };
 
-pub struct State {
+// ###################################################################
+//      Main Application State
+// ###################################################################
+
+pub struct State
+{
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -23,8 +28,10 @@ pub struct State {
     window: Arc<Window>,
 }
 
-impl State {
-    async fn new(window: Arc<Window>) -> anyhow::Result<State> {
+impl State
+{
+    async fn new(window: Arc<Window>) -> anyhow::Result<State>
+    {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -84,8 +91,10 @@ impl State {
         })
     }
 
-    pub fn resize(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 {
+    pub fn resize(&mut self, width: u32, height: u32)
+    {
+        if width > 0 && height > 0
+        {
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
@@ -94,24 +103,37 @@ impl State {
         println!("girl we be resizing! width: {width}, height: {height}");
     }
 
-    fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
-        match (code, is_pressed) {
+    fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool)
+    {
+        match (code, is_pressed)
+        {
             (KeyCode::Escape, true) => event_loop.exit(),
-            _ => {}
+            _ =>
+            {}
         }
 
-        if is_pressed {
+        if is_pressed
+        {
             println!("{code:?} was pressed");
-        } else {
+        }
+        else
+        {
             println!("{code:?} was released");
         }
     }
 
-    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    fn update(&mut self)
+    {
+        // remove `todo!()`
+    }
+
+    fn render(&mut self) -> Result<(), wgpu::SurfaceError>
+    {
         self.window.request_redraw();
 
         // We can't render unless the surface is configured
-        if !self.is_surface_configured {
+        if !self.is_surface_configured
+        {
             return Ok(());
         }
 
@@ -159,18 +181,27 @@ impl State {
     }
 }
 
-pub struct App {
+// ###################################################################
+//      App and ApplicationHandler
+// ###################################################################
+
+pub struct App
+{
     state: Option<State>,
 }
 
-impl App {
-    pub fn new() -> Self {
+impl App
+{
+    pub fn new() -> Self
+    {
         Self { state: None }
     }
 }
 
-impl ApplicationHandler<State> for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+impl ApplicationHandler<State> for App
+{
+    fn resumed(&mut self, event_loop: &ActiveEventLoop)
+    {
         #[allow(unused_mut)]
         let mut window_attributes = Window::default_attributes();
 
@@ -180,7 +211,8 @@ impl ApplicationHandler<State> for App {
     }
 
     #[allow(unused_mut)]
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: State) {
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: State)
+    {
         self.state = Some(event);
     }
 
@@ -189,17 +221,36 @@ impl ApplicationHandler<State> for App {
         event_loop: &ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: WindowEvent,
-    ) {
-        let state = match &mut self.state {
+    )
+    {
+        let state = match &mut self.state
+        {
             Some(canvas) => canvas,
             None => return,
         };
 
-        match event {
+        match event
+        {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => state.resize(size.width, size.height),
-            WindowEvent::RedrawRequested => {
-                state.render();
+            WindowEvent::RedrawRequested =>
+            {
+                state.update();
+                match state.render()
+                {
+                    Ok(_) =>
+                    {}
+                    // Reconfigure the surface if it's lost or outdated
+                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) =>
+                    {
+                        let size = state.window.inner_size();
+                        state.resize(size.width, size.height);
+                    }
+                    Err(e) =>
+                    {
+                        log::error!("unable to render {e}");
+                    }
+                }
             }
             WindowEvent::KeyboardInput {
                 event:
@@ -210,12 +261,14 @@ impl ApplicationHandler<State> for App {
                     },
                 ..
             } => state.handle_key(event_loop, code, key_state.is_pressed()),
-            _ => {}
+            _ =>
+            {}
         }
     }
 }
 
-pub fn run() -> anyhow::Result<()> {
+pub fn run() -> anyhow::Result<()>
+{
     env_logger::init();
 
     let event_loop = EventLoop::with_user_event().build()?;
@@ -227,8 +280,10 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn main() {
-    if let Err(e) = run() {
+fn main()
+{
+    if let Err(e) = run()
+    {
         eprint!("{e:#}");
     }
 }
