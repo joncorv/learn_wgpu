@@ -1493,6 +1493,7 @@ name = "learn_wgpu"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytemuck",
  "cargo-watch",
  "env_logger",
  "log",
